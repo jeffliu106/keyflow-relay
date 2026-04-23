@@ -17,8 +17,22 @@ Minimal Android SMS forwarder for the KeyFlow locksmith management system.
 | `SmsReceiver` | 运营商 SMS | `SMS_RECEIVED` 广播 |
 | `MessageListenerService` | **RCS / Chat features / 任何 Messages 通知** | Notification Listener |
 
-两个入口都走同一个 `MessageHandler` 管线（去重 → 白/黑名单 → HTTP POST）。
-`Dedupe` 用 sender + body 前缀 + 30 秒窗去重，防止 SMS 和通知同时触发导致重复转发。
+两个入口都走同一个 `MessageHandler` 管线：
+```
+serviceEnabled → (sender 无数字时) 联系人名解析回号码
+              → Dedup 双键 → Filter 白/黑名单 → Forwarder POST
+```
+
+**Dedup 双键** (v1.2.0):
+- 主键 = 归一化 sender + body 前 80 字 + 30 秒桶
+- 辅键 = "*" + body 前 80 字 + 30 秒桶（正文 ≥ 50 字符时启用）
+- 任一命中即视为重复。辅键解决了"SMS 记 `+17789070744`、通知记 `AI助理` 但是同一条消息"的问题
+- 短消息不启用辅键，避免两个人同时发 "ok" 被误合并
+
+**联系人解析** (v1.2.0, 需 READ_CONTACTS): 通知路径的 sender 是联系人显示名时（如 Samsung Messages 给已存联系人显示的"AI助理"），App 查通讯录把它解析回手机号，再交给后续步骤。效果：
+- 白名单写号码就够了，不用额外写联系人名
+- Dedup 两条路径收敛到同一 sender，更可靠
+- 服务器收到的 `sourceSender` 是真实号码，客户去重更准
 
 **本批次不做**：AI 解析、重试队列、App 锁、历史回溯。批次 ③ 再加。
 
@@ -45,7 +59,7 @@ Minimal Android SMS forwarder for the KeyFlow locksmith management system.
 ### 3. 配置
 
 1. 打开 **KeyFlow Relay** App
-2. 授予 SMS 和通知权限
+2. 授予 SMS、通知、**通讯录**（v1.2.0 起）权限
 3. 确认服务器地址（默认 `http://192.168.86.42:3001` 是开发环境；正式用改成 `:3000`）
 4. 点"测试连接"，应返回 `✅ HTTP 200`
 5. 填白名单（一行一个，最后一个 token 若是 `ai_hotline / colleague / repeat_customer / manual / unknown` 会被识别为来源标签）：
@@ -116,3 +130,11 @@ app/src/main/
 - `MESSAGING_PACKAGES` 白名单只包含 `com.samsung.android.messaging` 和
   `com.google.android.apps.messaging`；其他 App 的通知直接 `return`，不读 extras、不打日志、不转发
 - 消息体只在转发时通过 HTTPS/HTTP POST 发到 `DATABASE_URL` 对应的 KeyFlow 服务器，本地不落磁盘（日志只记 sender + 状态，不记正文）
+
+### READ_CONTACTS (v1.2.0 起)
+
+- 只查询联系人的 **显示名 → 电话号码** 一对字段（通过 `ContactsContract.CommonDataKinds.Phone`）
+- 不读取联系人头像、邮箱、备注、生日、地址等其他字段
+- 所有查询都是 "精确匹配给定名字"，不做任何枚举 / 遍历 / 备份
+- 不联网传输任何联系人数据；查出的号码只用于本机 Dedup 和 Filter 判定，以及随匹配到的消息一起 POST 到 KeyFlow 服务器（作为 `sourceSender`）
+- 未授权时查询直接返回 null，App 主流程正常（会 fallback 到 body-only 辅键 dedupe）

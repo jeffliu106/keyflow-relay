@@ -11,8 +11,8 @@ android {
         applicationId = "com.keyflow.relay"
         minSdk = 26          // Android 8.0
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     buildTypes {

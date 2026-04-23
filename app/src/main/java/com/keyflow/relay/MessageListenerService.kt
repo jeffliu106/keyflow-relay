@@ -11,16 +11,10 @@ import java.util.Date
 
 /**
  * 监听 Samsung Messages / Google Messages 的通知，用于捕获 RCS 消息。
+ * （Android 不把 RCS 广播给第三方 App，但 Messages 会发通知）
  *
- * 原理：Android 不把 RCS 广播到第三方 App（SMS_RECEIVED 只对运营商短信），
- * 但 Messages App 会给 RCS 消息弹通知。我们读通知的 title 作为发件人、
- * text (优先 BIG_TEXT) 作为正文，喂进和 SMS 一样的处理管线。
- *
- * 权限：BIND_NOTIFICATION_LISTENER_SERVICE 是 signature-level，用户必须在
- * 系统设置"通知访问权限"里手动打勾，不能通过 runtime 弹窗拿。
- *
- * 隐私：虽然权限允许读所有 App 的通知，本服务只处理 MESSAGING_PACKAGES 白名单
- * 里的包，其它通知直接 return，不读、不存、不转发。
+ * 隐私：虽然权限允许读所有 App 通知，本服务只处理 MESSAGING_PACKAGES 白名单内的包，
+ *      其它通知直接 return，不读 extras、不打日志、不转发。
  */
 class MessageListenerService : NotificationListenerService() {
 
@@ -35,7 +29,6 @@ class MessageListenerService : NotificationListenerService() {
 
         val extras = sbn.notification?.extras ?: return
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim().orEmpty()
-        // 展开通知优先 (BIG_TEXT)，降级到普通 text
         val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
         val text = (bigText ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString())
             ?.trim()
@@ -43,10 +36,15 @@ class MessageListenerService : NotificationListenerService() {
 
         if (title.isEmpty() || text.isEmpty()) return
 
-        // 过滤掉通知摘要（比如 "2 new messages from John"）
-        // 这些没有实际消息体，不转发；真正的消息通知在 EXTRA_TEXT 里是具体内容
+        // 摘要通知（"2 new messages from John"）→ 丢
         if (looksLikeSummary(text)) {
             Logger.log(applicationContext, "SKIP notif from=$title reason=summary")
+            return
+        }
+
+        // 结构化长消息被截断（如 AI 热线 lead 通知），让 SMS 路径兜底
+        if (isLikelyTruncatedStructured(text)) {
+            Logger.log(applicationContext, "SKIP notif from=$title reason=truncated")
             return
         }
 
@@ -63,7 +61,7 @@ class MessageListenerService : NotificationListenerService() {
 
     /**
      * "2 new messages" / "N unread" / "未读 N 条" 等摘要格式。
-     * 简单判定：通知文本非常短 + 包含数字 + 关键词
+     * 短文本 + 含数字 + 关键词即视为摘要。
      */
     private fun looksLikeSummary(text: String): Boolean {
         if (text.length > 60) return false
@@ -76,11 +74,43 @@ class MessageListenerService : NotificationListenerService() {
         return hasSummaryWord && hasDigit
     }
 
+    /**
+     * 启发式：正文含结构化标记（Summary/Details/Conversation Summary）
+     * AND 结尾不是正常句末标点 → 很可能被通知渲染截断。
+     *
+     * 这类消息几乎总有对应的 SMS 广播（AI 热线走运营商发），
+     * 主动放弃这条通知 path 让 SMS 拿到完整正文。
+     *
+     * 副作用：如果真的只有 RCS 没有 SMS（罕见），会丢这条。
+     *        权衡后认为可接受——结构化模板消息几乎都走 SMS。
+     */
+    private fun isLikelyTruncatedStructured(text: String): Boolean {
+        val trimmed = text.trimEnd()
+        if (trimmed.isEmpty()) return false
+        val last = trimmed.last()
+        val properEnd = last in PROPER_ENDINGS
+        if (properEnd) return false
+
+        val hasStructureMarker = STRUCTURE_MARKERS.any {
+            text.contains(it, ignoreCase = true)
+        }
+        return hasStructureMarker
+    }
+
     companion object {
-        /** 已知消息 App 包名白名单 — 只监听这些 */
+        /** 已知消息 App 包名白名单 */
         private val MESSAGING_PACKAGES = setOf(
             "com.samsung.android.messaging",     // Samsung Messages (Flip 7 默认)
             "com.google.android.apps.messaging"  // Google Messages
+        )
+
+        private val PROPER_ENDINGS = setOf(
+            '.', '!', '?', ')', '"', '\'', '。', '！', '？', '…', ']', '】'
+        )
+
+        private val STRUCTURE_MARKERS = listOf(
+            "Summary:", "Details:", "Conversation Summary",
+            "对话摘要", "详情："
         )
     }
 }
