@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KeyFlow Relay</string>
+
+    <!-- Default server URL: KeyFlow dev instance on LAN. Change after Tailscale setup. -->
+    <string name="default_server_url">http://192.168.86.42:3001</string>
+
+    <!-- Main screen labels -->
+    <string name="label_server_url">KeyFlow 服务器地址</string>
+    <string name="hint_server_url">http://192.168.86.42:3001</string>
+    <string name="label_whitelist">白名单 (号码 + 可选来源标签)</string>
+    <string name="hint_whitelist">一行一个，格式：\n+16045550101 ai_hotline\n6049876543 colleague\n(604) 555-1234</string>
+    <string name="label_blacklist">黑名单关键词（号码或内容命中即丢弃）</string>
+    <string name="hint_blacklist">一行一个关键词</string>
+    <string name="label_service_enabled">转发服务开关</string>
+    <string name="label_recent_logs">最近日志</string>
+
+    <string name="btn_test_connection">测试连接</string>
+    <string name="btn_save">保存</string>
+    <string name="btn_clear_logs">清空日志</string>
+    <string name="btn_battery_settings">去打开\"电池未受限\"</string>
+
+    <string name="msg_saved">已保存</string>
+    <string name="msg_testing">测试中…</string>
+    <string name="msg_test_ok">✅ 连接成功（HTTP 200）</string>
+    <string name="msg_test_fail_prefix">❌ 连接失败：</string>
+    <string name="msg_perm_required">SMS 权限是必须的，否则无法接收短信</string>
+    <string name="msg_no_logs">暂无日志</string>
+
+    <string name="notif_channel_name">KeyFlow Relay</string>
+    <string name="notif_channel_desc">前台保活提示（静默）</string>
+    <string name="notif_title">KeyFlow Relay</string>
+    <string name="notif_text">Running</string>
+</resources>
