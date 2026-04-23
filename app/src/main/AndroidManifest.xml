@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Notification listener 需要的声明（实际授权在系统"通知访问权限"设置里） -->
+    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+        tools:ignore="ProtectedPermissions" />
 
     <application
         android:name=".RelayApp"
@@ -56,5 +59,16 @@
             android:name=".ForwardingService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- 通知监听服务：抓取 Samsung/Google Messages 弹出的通知以捕获 RCS -->
+        <service
+            android:name=".MessageListenerService"
+            android:exported="false"
+            android:label="@string/notif_listener_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

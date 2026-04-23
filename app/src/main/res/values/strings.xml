@@ -8,8 +8,8 @@
     <!-- Main screen labels -->
     <string name="label_server_url">KeyFlow 服务器地址</string>
     <string name="hint_server_url">http://192.168.86.42:3001</string>
-    <string name="label_whitelist">白名单 (号码 + 可选来源标签)</string>
-    <string name="hint_whitelist">一行一个，格式：\n+16045550101 ai_hotline\n6049876543 colleague\n(604) 555-1234</string>
+    <string name="label_whitelist">白名单 (号码 / 联系人名 + 可选来源标签)</string>
+    <string name="hint_whitelist">一行一个：\n+16045550101 ai_hotline\n6049876543 colleague\nLiu Zheng ai_hotline</string>
     <string name="label_blacklist">黑名单关键词（号码或内容命中即丢弃）</string>
     <string name="hint_blacklist">一行一个关键词</string>
     <string name="label_service_enabled">转发服务开关</string>
@@ -27,6 +27,15 @@
     <string name="msg_perm_required">SMS 权限是必须的，否则无法接收短信</string>
     <string name="msg_no_logs">暂无日志</string>
 
+    <!-- Notification listener -->
+    <string name="notif_listener_label">KeyFlow Relay 消息监听</string>
+    <string name="label_notif_listener_on">通知监听（RCS）: ✅ 已启用</string>
+    <string name="label_notif_listener_off">通知监听（RCS）: ❌ 未启用</string>
+    <string name="notif_listener_hint">RCS / Chat 消息不触发 SMS 广播，必须靠通知监听抓取</string>
+    <string name="btn_notif_listener_grant">去授权</string>
+    <string name="btn_notif_listener_revoke">管理</string>
+
+    <!-- Foreground service notification channel -->
     <string name="notif_channel_name">KeyFlow Relay</string>
     <string name="notif_channel_desc">前台保活提示（静默）</string>
     <string name="notif_title">KeyFlow Relay</string>

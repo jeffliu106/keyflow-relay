@@ -1,6 +1,7 @@
 package com.keyflow.relay
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -60,6 +61,7 @@ class MainActivity : AppCompatActivity() {
             refreshLogs()
         }
         binding.btnBatterySettings.setOnClickListener { openBatteryOptimizationSettings() }
+        binding.btnNotifListener.setOnClickListener { openNotificationAccessSettings() }
 
         binding.swService.setOnCheckedChangeListener { _, checked ->
             settings.serviceEnabled = checked
@@ -71,13 +73,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 首次进来就请求权限
         requestPermissionsIfNeeded()
+        updateNotifListenerUi()
     }
 
     override fun onResume() {
         super.onResume()
         refreshLogs()
+        updateNotifListenerUi()
     }
 
     // ---- Actions ----
@@ -141,8 +144,42 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
+     * 检查 MessageListenerService 是否被系统 enable（通知访问权限开了）。
+     * 原理：enabled_notification_listeners 里是冒号分隔的 "pkg/class" 列表。
+     */
+    private fun isNotificationListenerEnabled(): Boolean {
+        val flat = AndroidSettings.Secure.getString(
+            contentResolver, "enabled_notification_listeners"
+        ) ?: return false
+        val me = ComponentName(this, MessageListenerService::class.java).flattenToString()
+        val meShort = ComponentName(this, MessageListenerService::class.java).flattenToShortString()
+        return flat.split(':').any { it == me || it == meShort }
+    }
+
+    private fun updateNotifListenerUi() {
+        val enabled = isNotificationListenerEnabled()
+        binding.tvNotifListenerStatus.setText(
+            if (enabled) R.string.label_notif_listener_on
+            else R.string.label_notif_listener_off
+        )
+        binding.btnNotifListener.setText(
+            if (enabled) R.string.btn_notif_listener_revoke
+            else R.string.btn_notif_listener_grant
+        )
+    }
+
+    private fun openNotificationAccessSettings() {
+        try {
+            startActivity(Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        } catch (_: Exception) {
+            toast("无法打开通知访问设置，请手动：设置 → 通知 → 通知访问权限")
+        }
+    }
+
+    /**
      * 跳系统设置让用户把本 App 从电池优化名单里移出去。
-     * 三星 One UI 另有 "睡眠应用" / "永不睡眠应用" 列表，需要用户自己再进 Settings → 应用 → KeyFlow Relay 设置。
+     * 三星 One UI 另有 "睡眠应用" / "深度休眠应用" 列表，需要用户自己再进
+     * 设置 → 应用 → KeyFlow Relay → 电池 设置。
      */
     private fun openBatteryOptimizationSettings() {
         try {
@@ -156,7 +193,6 @@ class MainActivity : AppCompatActivity() {
             ).apply { data = Uri.parse("package:$packageName") }
             startActivity(intent)
         } catch (_: Exception) {
-            // 回退到应用详情页，让用户手动找"电池 -> 未受限"
             try {
                 startActivity(
                     Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS)
